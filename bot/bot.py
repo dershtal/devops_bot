@@ -11,20 +11,20 @@ logging.basicConfig(filename='bot.log', format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger(__name__)
 
 # Параметры SSH
-HOST = os.getenv('RM_HOST')
-SSH_PORT = os.getenv('RM_PORT')
-USERNAME = os.getenv('RM_USER')
-PASSWORD = os.getenv('RM_PASSWORD')
+RM_HOST = os.getenv('RM_HOST')
+RM_PORT = os.getenv('RM_PORT')
+RM_USER = os.getenv('RM_USER')
+RM_PASSWORD = os.getenv('RM_PASSWORD')
 
 # Параметры SSH для базы данных
-DB_NAME = os.getenv('DB_DATABASE')
+DB_DATABASE = os.getenv('DB_DATABASE')
 DB_USER = os.getenv('DB_USER')
 DB_PASSWORD = os.getenv('DB_PASSWORD')
 DB_HOST = os.getenv('DB_HOST')
 DB_PORT = os.getenv('DB_PORT')
 
 # Токен из .env файла
-BOT_TOKEN = os.getenv('TOKEN')
+TOKEN = os.getenv('TOKEN')
 
 # Стадии разговора
 CHOOSING, GET_PACKAGE_INFO, INPUT_TEXT_PHONE, CONFIRM_SAVE_PHONE, INPUT_TEXT_EMAIL, CONFIRM_SAVE_EMAIL, VERIFY_PASSWORD = range(7)
@@ -84,8 +84,8 @@ def input_text_pn(update: Update, context: CallbackContext) -> int:
         update.message.reply_text(f"Найдены номера: {' '.join(phone_numbers)}. Хотите сохранить их в базу данных?", reply_markup=reply_markup)
         return CONFIRM_SAVE_PHONE
 
-# Обработка подтверждения
-def confirm_savepn(update: Update, context: CallbackContext) -> int:
+# Обработка подтверждения для номеров телефона
+def confirm_save_phone(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     query.answer()
     if query.data == "yes":
@@ -98,7 +98,7 @@ def confirm_savepn(update: Update, context: CallbackContext) -> int:
 
 # Сохранение номеров телефона в базу данных
 def save_phone_numbers(phone_numbers):
-    conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
+    conn = psycopg2.connect(dbname=DB_DATABASE, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
     cur = conn.cursor()
     for number in phone_numbers:
         cur.execute("INSERT INTO phone_numbers (phone_number) VALUES (%s) ON CONFLICT DO NOTHING", (number,))
@@ -134,8 +134,8 @@ def input_text_em(update: Update, context: CallbackContext) -> int:
         update.message.reply_text(f"Найдены адреса: {' '.join(email_address)}. Хотите сохранить их в базу данных?", reply_markup=reply_markup)
         return CONFIRM_SAVE_EMAIL
 
-# Обработка подтверждения
-def confirm_savepn(update: Update, context: CallbackContext) -> int:
+# Обработка подтверждения для адресов электронной почты
+def confirm_save_email(update: Update, context: CallbackContext) -> int:
     query = update.callback_query
     query.answer()
     if query.data == "yes":
@@ -146,16 +146,17 @@ def confirm_savepn(update: Update, context: CallbackContext) -> int:
         query.edit_message_text(text="Сохранение отменено.")
     return ConversationHandler.END
 
-# Сохранение номеров телефона в базу данных
+# Сохранение Адреса почты в базу данных
 def save_email_address(email_address):
-    conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
+    conn = psycopg2.connect(dbname=DB_DATABASE, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
     cur = conn.cursor()
-    for number in email_address:
-        cur.execute("INSERT INTO email (email) VALUES (%s) ON CONFLICT DO NOTHING", (number,))
+    for email in email_address:
+        cur.execute("INSERT INTO emails (email) VALUES (%s) ON CONFLICT DO NOTHING", (email,))
     conn.commit()
     cur.close()
     conn.close()
 #-----------------------------------------------------------------------------------------
+
 
 #-----------------------------------------------------------------------------------------
 # Проверка Пароля
@@ -188,11 +189,12 @@ def echo(update: Update, context):
 def execute_ssh_command(update, command, message_prefix):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(HOST, port=SSH_PORT, username=USERNAME, password=PASSWORD)
+    ssh.connect(RM_HOST, port=RM_PORT, username=RM_USER, password=RM_PASSWORD)
     stdin, stdout, stderr = ssh.exec_command(command)
     result = stdout.read().decode('utf-8')
+    error = stderr.read().decode('utf-8')
     ssh.close()
-    update.message.reply_text(message_prefix + result)
+    update.message.reply_text(message_prefix + result + error)
 #-----------------------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------------------
@@ -200,7 +202,7 @@ def execute_ssh_command(update, command, message_prefix):
 #-----------------------------------------------------------------------------------------
 def get_db_data(update: Update, context: CallbackContext, query):
     try:
-        conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
+        conn = psycopg2.connect(dbname=DB_DATABASE, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
         cur = conn.cursor()
         cur.execute(query)
         rows = cur.fetchall()
@@ -218,7 +220,7 @@ def get_db_data(update: Update, context: CallbackContext, query):
 
     # Команды для вывода данных
 def get_emails(update: Update, context: CallbackContext):
-    get_db_data(update, context, "SELECT id, email FROM email")
+    get_db_data(update, context, "SELECT id, email FROM emails")
 
 def get_phone_numbers(update: Update, context: CallbackContext):
     get_db_data(update, context, "SELECT id, phone_number FROM phone_numbers")
@@ -243,7 +245,7 @@ def button(update, context):
         case 'get_apt_list1':
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(HOST, port=SSH_PORT, username=USERNAME, password=PASSWORD)
+            ssh.connect(RM_HOST, port=RM_PORT, username=RM_USER, password=RM_PASSWORD)
             command = 'dpkg-query -f \'${binary:Package}\\n\' -W'
             stdin, stdout, stderr = ssh.exec_command(command)
             packages = stdout.read().decode('utf-8').strip().split('\n')
@@ -328,7 +330,7 @@ def get_services(update, context):
 
     # Получения логов PostgreSQL
 def get_repl_logs(update, context):
-    command = "cat /var/log/postgresql/postgresql-15-main.log | head -10"
+    command = "docker logs db_repl_image"
     execute_ssh_command(update, command, "PostgreSQL logs:\n")
 
 
@@ -344,7 +346,7 @@ def cancel(update, context):
 #-----------------------------------------------------------------------------------------
 def main():
     # Создаем Updater и передаем ему токен вашего бота.
-    updater = Updater(BOT_TOKEN, use_context=True)
+    updater = Updater(TOKEN, use_context=True)
     # Получаем диспетчера для регистрации обработчиков
     dp = updater.dispatcher
 
@@ -360,7 +362,7 @@ def main():
         states={
             # Этапы разговора
             INPUT_TEXT_PHONE: [MessageHandler(Filters.text & ~Filters.command, input_text_pn)],
-            CONFIRM_SAVE_PHONE: [CallbackQueryHandler(confirm_savepn)]
+            CONFIRM_SAVE_PHONE: [CallbackQueryHandler(confirm_save_phone)]
         },
         # Точка выхода из разговора
         fallbacks=[CommandHandler('start', start)]
@@ -371,7 +373,7 @@ def main():
         entry_points=[CommandHandler('find_email_address', find_email_address)],
         states={
             INPUT_TEXT_EMAIL: [MessageHandler(Filters.text & ~Filters.command, input_text_em)],
-            CONFIRM_SAVE_EMAIL: [CallbackQueryHandler(confirm_savepn)]
+            CONFIRM_SAVE_EMAIL: [CallbackQueryHandler(confirm_save_email)]
         },
         fallbacks=[CommandHandler('start', start)]
     )
