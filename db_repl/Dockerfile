@@ -1,16 +1,18 @@
-FROM postgres:16
+FROM postgres:15.6
 
+RUN mkdir -p /etc/postgresql/ 
+RUN chmod 750 /var/lib/postgresql/data
 
-RUN echo "#!/bin/bash" > /usr/local/bin/init.sh && \
-echo "rm -rf /var/lib/postgresql/data/*" >> /usr/local/bin/init.sh && \
-echo "until pg_basebackup -h db -D /var/lib/postgresql/data -U repl_user -vP -w; do" >> /usr/local/bin/init.sh && \
-echo "  echo 'Replica not ready, trying again...'" >> /usr/local/bin/init.sh && \
-echo "  sleep 1" >> /usr/local/bin/init.sh && \
-echo "done" >> /usr/local/bin/init.sh && \
-echo "chown -R postgres:postgres /var/lib/postgresql/data" >> /usr/local/bin/init.sh && \
-echo "chmod 700 /var/lib/postgresql/data" >> /usr/local/bin/init.sh && \
-echo "su - postgres -c 'exec /usr/lib/postgresql/16/bin/postgres -D /var/lib/postgresql/data'" >> /usr/local/bin/init.sh
+ENTRYPOINT [ "bash", "-c", "\
+cat <<EOF > /etc/postgresql/postgresql.conf \n\
+listen_addresses = 'localhost, ${DB_REPL_HOST}' \n\
+port = ${DB_REPL_PORT} \n\
+EOF\n\
+rm -rf /var/lib/postgresql/data/* \n\
+sleep 10 \n\
+echo ${DB_REPL_PASSWORD} | pg_basebackup -v -R \\\n\
+  -h ${DB_HOST} -p ${DB_PORT} -U ${DB_REPL_USER} -W -P \\\n\
+  -D /var/lib/postgresql/data \n\
+docker-entrypoint.sh $@"]
 
-RUN chmod +x /usr/local/bin/init.sh
-
-CMD ["/usr/local/bin/init.sh"]
+CMD ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
