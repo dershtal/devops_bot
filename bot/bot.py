@@ -1,5 +1,5 @@
 # Импорт библиотек
-import logging, re, paramiko, os
+import logging, re, paramiko, os, subprocess
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (Updater, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, Filters, CallbackContext)
 from dotenv import load_dotenv
@@ -25,6 +25,9 @@ DB_PORT = os.getenv('DB_PORT')
 
 # Токен из .env файла
 TOKEN = os.getenv('TOKEN')
+
+# Инициализация переменной окружения
+LOG_FILE_PATH = "/var/log/postgresql/postgresql.log"
 
 # Стадии разговора
 CHOOSING, GET_PACKAGE_INFO, INPUT_TEXT_PHONE, CONFIRM_SAVE_PHONE, INPUT_TEXT_EMAIL, CONFIRM_SAVE_EMAIL, VERIFY_PASSWORD = range(7)
@@ -280,7 +283,7 @@ def get_uname(update, context):
 
     # Сбор информации о времени работы.
 def get_uptime(update, context):
-    command = "uptime -p"
+    command = "uptime"
     execute_ssh_command(update, command, "Информация о времени работы:\n")
 
     # Сбор информации о состоянии файловой системы.
@@ -315,24 +318,38 @@ def get_critical(update, context):
 
     # Сбор информации о запущенных процессах.
 def get_ps(update, context):
-    command = "ps -eo comm --no-headers"
+    command = "ps aux | head -n 5"
     execute_ssh_command(update, command, "Запущенные процессы:\n")
     
     # Сбор информации об используемых портах.
 def get_ss(update, context):
-    command = "ss -tuln"
+    command = "ss -tulwn"
     execute_ssh_command(update, command, "Используемые порты:\n")
 
     # Сбор информации о запущенных сервисах. 
 def get_services(update, context):
-    command = "systemctl list-units --type=service --state=running --no-legend | awk '{print $1}'"
+    command = "systemctl list-units --type=service | head -n 5"
     execute_ssh_command(update, command, "Информация о запущенных сервисах:\n")
 
-    # Получения логов PostgreSQL
-def get_repl_logs(update, context):
-    command = "docker logs db_repl_image"
-    execute_ssh_command(update, command, "PostgreSQL logs:\n")
-
+#-----------------------------------------------------------------------------------------
+# Получения логов PostgreSQL
+#-----------------------------------------------------------------------------------------
+def get_repl_logs(update: Update, context: CallbackContext) -> None:
+    try:
+        # Выполнение команды для получения логов
+        result = subprocess.run(
+            ["bash", "-c", f"cat {LOG_FILE_PATH} | grep repl | tail -n 15"],
+            capture_output=True,
+            text=True
+        )
+        logs = result.stdout
+        if logs:
+            update.message.reply_text(f"Последние репликационные логи:\n{logs}")
+        else:
+            update.message.reply_text("Репликационные логи не найдены.")
+    except Exception as e:
+        update.message.reply_text(f"Ошибка при получении логов: {str(e)}")
+#-----------------------------------------------------------------------------------------
 
 # chmod 777 /var/log/postgresql/postgresql-15-main.log - для пользователя чей логин используем в запросе
 
@@ -398,6 +415,8 @@ def main():
         
         fallbacks=[CommandHandler('cancel', cancel)]
     )
+    # Сбор информации об логах базы данных
+    repl_logs_handler = CommandHandler('get_repl_logs', get_repl_logs)
 
     # Регистрируем обработчики команд
     # Обработчики текста
@@ -423,7 +442,7 @@ def main():
     dp.add_handler(conv_handler_get_apt_list)
 
     # Обработчики команд для взаимодействия с Базой данных
-    dp.add_handler(CommandHandler('get_repl_logs', get_repl_logs))
+    dp.add_handler(repl_logs_handler)
     dp.add_handler(CommandHandler('get_emails', get_emails))
     dp.add_handler(CommandHandler('get_phone_numbers', get_phone_numbers))
 
