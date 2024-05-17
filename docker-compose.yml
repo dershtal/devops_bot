@@ -1,67 +1,52 @@
-version: '3.3'
+version: "3"
 services:
   bot:
-    image: bot
+    image: bot_image
     build:
-      context: ./bot
-      dockerfile: Dockerfile
-    container_name: bot_image
-    env_file:
-      - .env
+        context: ./bot
+    environment:
+      - TOKEN=${TOKEN}
+      - RM_HOST=${RM_HOST}
+      - RM_PORT=${RM_PORT}
+      - RM_USER=${RM_USER}
+      - RM_PASSWORD=${RM_PASSWORD}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_DATABASE=${DB_DATABASE}
     volumes:
-      - ./bot:/bot
-    depends_on:
-      - db
-
+      - pg_logs:/var/log/
+    container_name: "${BOT}"
   db:
-    image: db
-    build:
-      context: ./db
-      dockerfile: Dockerfile
-    ports:
-      - ${DB_PORT}:5432
-    container_name: db_image
-    environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_DB: ${DB_DATABASE}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_HOST_AUTH_METHOD: "scram-sha-256\nhost replication all 0.0.0.0/0 md5"
-      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
-    env_file:
-      - .env
-    command: |
-      postgres
-      -c listen_addresses=*
-      -c unix_socket_directories=/var/run/postgresql
-      -c log_replication_commands=on
-      -c archive_mode=on
-      -c wal_log_hints=on
-      -c wal_level=replica
-      -c hot_standby=on
-      -c max_wal_senders=10
-      -c max_replication_slots=10
-      -c hot_standby_feedback=on
-      -c password_encryption=scram-sha-256
+    image: db_image
+    build: ./db
     volumes:
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: 'pg_isready -U ${DB_USER} --dbname=${DB_DATABASE}'
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  db_repl:
-    image: db_repl
-    build:
-      context: ./db_repl
-      dockerfile: Dockerfile
-    ports:
-      - ${DB_REPL_PORT}:5432
-    container_name: db_repl_image
+      - pg_logs:/var/log/
     environment:
-      PGUSER: ${DB_REPL_USER}
-      PGPASSWORD: ${DB_REPL_PASSWORD}
-    env_file:
-      - .env
-    depends_on:
-      - db
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - DB_REPL_USER=${DB_REPL_USER}
+      - DB_REPL_PASSWORD=${DB_REPL_PASSWORD}
+      - DB_REPL_HOST=${DB_REPL_HOST}.my_network
+      - DB_PORT=${DB_PORT}
+      - DB_DATABASE=${DB_DATABASE}
+    container_name: "${DB_HOST}"
+  db_repl:
+    image: db_repl_image
+    build: ./db_repl
+    container_name: "${DB_REPL_HOST}"
+    environment:
+      - DB_HOST=${DB_HOST}.my_network
+      - DB_PORT=${DB_PORT}
+      - DB_REPL_HOST=${DB_REPL_HOST}
+      - DB_REPL_PORT=${DB_REPL_PORT}
+      - DB_REPL_USER=${DB_REPL_USER}
+      - DB_REPL_PASSWORD=${DB_REPL_PASSWORD}
+volumes:
+  pg_data:
+  pg_logs:
+networks:
+  default:
+    name: my_network
+    external: true
