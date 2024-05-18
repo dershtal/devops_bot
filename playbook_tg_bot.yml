@@ -62,7 +62,7 @@
       when: postgres_status.stdout.find('is not running') != -1
 
 - name: CONFIGURATING MASTERDB
-  hosts: hostBotMasterDB
+  hosts: ansible1
   become: yes
   tasks:
     - name: Install psycopg2
@@ -136,7 +136,7 @@
       ignore_errors: true
 
 - name: CONFIGURATING SLAVEDB
-  hosts: hostReplicaDB
+  hosts: ansible2
   become: yes
   tasks:
     - name: Find out if PostgreSQL is initialized
@@ -211,7 +211,7 @@
         DB_REPL_PASSWORD: "{{ hostvars[inventory_hostname]['DB_REPL_PASSWORD'] }}"
 
 - name: CONFIGURATING BOT
-  hosts: hostBotMasterDB
+  hosts: ansible1
   become: yes
   tasks:
     - name: Install Python packages

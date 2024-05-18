@@ -1,11 +1,11 @@
-    all:
+all:
   hosts:
-    hostBotMasterDB:
+    ansible1:
       ansible_user: ansible1
       ansible_ssh_pass: der123
       ansible_host: 192.168.217.165
 
-    hostReplicaDB: 
+    ansible2: 
       ansible_user: ansible2
       ansible_ssh_pass: der123
       ansible_host: 192.168.217.166
