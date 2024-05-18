@@ -20,7 +20,7 @@ all:
     DB_USER: postgres
     DB_PASSWORD: Qq12345
     DB_DATABASE: base_pt
-    TOKEN: 6445340909:AAFn6UhF_jFszDtgoytPwzLLlSC0NzZH9xg
+    TOKEN: 
     RM_HOST: 192.168.217.165
     RM_PORT: 22
     RM_USER: ansible1
