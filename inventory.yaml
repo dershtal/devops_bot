@@ -1,0 +1,27 @@
+    all:
+  hosts:
+    hostBotMasterDB:
+      ansible_user: ansible1
+      ansible_ssh_pass: der123
+      ansible_host: 192.168.217.165
+
+    hostReplicaDB: 
+      ansible_user: ansible2
+      ansible_ssh_pass: der123
+      ansible_host: 192.168.217.166
+
+  vars:
+    DB_REPL_HOST: 192.168.217.166
+    DB_REPL_USER: repl_user
+    DB_REPL_PASSWORD: Qq12345
+    DB_REPL_PORT: 5432
+    DB_HOST: 192.168.217.165
+    DB_PORT: 5432
+    DB_USER: postgres
+    DB_PASSWORD: Qq12345
+    DB_DATABASE: base_pt
+    TOKEN: 6445340909:AAFn6UhF_jFszDtgoytPwzLLlSC0NzZH9xg
+    RM_HOST: 192.168.217.165
+    RM_PORT: 22
+    RM_USER: ansible1
+    RM_PASSWORD: der123
